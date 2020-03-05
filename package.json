@@ -1,0 +1,14 @@
+{
+  "name": "sleepybot",
+  "version": "0.0.1",
+  "description": "an interactive bot for managing your bedtime",
+  "main": "app.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Thomas van Arkel",
+  "license": "ISC",
+  "dependencies": {
+    "botgram": "^2.2.0"
+  }
+}
