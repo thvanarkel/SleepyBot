@@ -3,12 +3,14 @@
   "version": "0.0.1",
   "description": "an interactive bot for managing your bedtime",
   "main": "app.js",
+  "license": "MIT",
+  "repository": "https://github.com/thvanarkel/SleepyBot",
   "scripts": {
-    "test": "test"
+    "start": "node app.js"
   },
   "author": "Thomas van Arkel",
-  "license": "ISC",
   "dependencies": {
-    "botgram": "^2.2.0"
+    "botgram": "^2.2.0",
+    "node-cron": "^2.0.3"
   }
 }
