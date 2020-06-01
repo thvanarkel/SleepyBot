@@ -6,13 +6,18 @@
   "license": "MIT",
   "repository": "https://github.com/thvanarkel/SleepyBot",
   "scripts": {
-    "start": "node app.js"
+    "start": "nodemon app.js"
   },
   "author": "Thomas van Arkel",
   "dependencies": {
     "@influxdata/influxdb-client": "^1.1.0",
     "botgram": "^2.2.0",
     "dotenv": "^8.2.0",
-    "node-cron": "^2.0.3"
+    "javascript-state-machine": "^3.1.0",
+    "node-cron": "^2.0.3",
+    "node-telegram-bot-api": "^0.50.0",
+    "socks5-https-client": "^1.2.1",
+    "telegraf": "^3.38.0",
+    "telegraf-session-local": "^1.0.2"
   }
 }
