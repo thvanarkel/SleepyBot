@@ -18,6 +18,7 @@
     "node-telegram-bot-api": "^0.50.0",
     "socks5-https-client": "^1.2.1",
     "telegraf": "^3.38.0",
+    "telegraf-keyboard": "^1.1.2",
     "telegraf-session-local": "^1.0.2"
   }
 }
