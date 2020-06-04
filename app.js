@@ -83,7 +83,7 @@ const setup = new WizardScene(
 		state.chatID = ctx.message.chat.id;
 		await ctx.reply('Laten we beginnen met configuren.')
 		await ctx.reply('Wetenschappelijk onderzoek heeft aangetoond dat op regelmatige tijden naar bed gaan en opstaan werkt om beter te slapen.')
-		ctx.reply('Hoe laat wil je in bed liggen om te slapen?', Extra.markup(Markup.removeKeyboard()));
+		ctx.reply('Hoe laat wil je iedere dag in bed liggen om te slapen?', Extra.markup(Markup.removeKeyboard()));
 		return next(ctx, false);
 	},
 	(ctx) => {
@@ -205,13 +205,13 @@ setup.action('done', async (ctx) => {
 
 		console.log(`0 ${minutes} ${hour} * * ${days}`);
 		if (state.configuring === "bedtime") {
-			state.selectedDays = currentDays;
+			state.selectedDays = state.currentDays;
 			if (state.bedtimeTask) state.bedtimeTask.destroy();
 			state.bedtimeTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
 				bot.telegram.sendMessage(state.chatID, "Het is tijd!");
 			});
 		} else {
-			state.selectedAlarmDays = currentDays;
+			state.selectedAlarmDays = state.currentDays;
 			if (state.alarmTask) state.alarmTask.destroy();
 			state.alarmTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
 				bot.telegram.sendMessage(state.chatID, "Tijd om op te staan!");

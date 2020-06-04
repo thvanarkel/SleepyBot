@@ -4,14 +4,19 @@ const
   Telegraf = require('telegraf'),
   LocalSession = require('telegraf-session-local')
 
+const os = require('os');
+const homedir = os.homedir();
+
 const bot = new Telegraf(process.env.BOT_TOKEN) // Your Bot token here
 
 // Name of session property object in Telegraf Context (default: 'session')
-const property = 'data'
+const property = 'session'
+
+
 
 const localSession = new LocalSession({
   // Database name/path, where sessions will be located (default: 'sessions.json')
-  database: 'example_db.json',
+  database: homedir + '/example_db.json',
   // Name of session property object in Telegraf Context (default: 'session')
   property: 'session',
   // Type of lowdb storage (default: 'storageFileSync')
@@ -36,6 +41,7 @@ localSession.DB.then(DB => {
 bot.use(localSession.middleware(property))
 
 bot.on('text', (ctx, next) => {
+  console.log(ctx.message)
   ctx[property].counter = ctx[property].counter || 0
   ctx[property].counter++
   ctx.replyWithMarkdown(`Counter updated, new value: \`${ctx.session.counter}\``)
