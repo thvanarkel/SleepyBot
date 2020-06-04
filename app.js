@@ -347,7 +347,11 @@ const reminding = new WizardScene('reminding',
 		]))
 	},
 	async (ctx) => {
-		await ctx.reply('Tijd om die telefoon weg te leggen!');
+		await ctx.reply(randomItem[
+			'Tijd om die telefoon weg te leggen!',
+			'Tijd om het bed in te duiken!',
+			'Zet die do not disturb modus maar aan!',
+			'Tijd om dag te zeggen!']);
 		await ctx.replyWithAnimation('CgACAgQAAxkBAAIN2l7Y8wsjbXAqsjHCqUbgr_Q-eSQ5AAJWAgACDIakUsYgTfEFKE5cGgQ')
 		ctx.reply(randomItem([
 			'Slaap lekker!',
@@ -361,7 +365,7 @@ const reminding = new WizardScene('reminding',
 )
 
 const scheduleReminder = (ctx) => {
-	state.reminderTask = cron.schedule(`*/30 * * * * *`, () => {
+	state.reminderTask = cron.schedule(`1 */3 * * * *`, () => {
 		next(ctx, true);
 	});
 }
