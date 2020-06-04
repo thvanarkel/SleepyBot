@@ -7,6 +7,7 @@ const dotenv = require('dotenv').config();
 // const cron = require('node-cron');
 
 const Telegraf = require('telegraf')
+const LocalSession = require('telegraf-session-local')
 const session = require('telegraf/session')
 const Composer = require('telegraf/composer')
 const { Extra, Markup } = require('telegraf')
@@ -15,6 +16,36 @@ const Scene = require('telegraf/scenes/base')
 const WizardScene = require('telegraf/scenes/wizard');
 const Keyboard = require('telegraf-keyboard');
 const cron = require('node-cron');
+const os = require('os');
+const homedir = os.homedir();
+
+const property = 'session'
+
+const localSession = new LocalSession({
+  // Database name/path, where sessions will be located (default: 'sessions.json')
+  database: homedir + '/bot_db.json',
+  // Name of session property object in Telegraf Context (default: 'session')
+  property: 'session',
+  // Type of lowdb storage (default: 'storageFileSync')
+  storage: LocalSession.storageFileAsync,
+  // Format of storage/database (default: JSON.stringify / JSON.parse)
+  format: {
+    serialize: (obj) => JSON.stringify(obj, null, 2), // null & 2 for pretty-formatted JSON
+    deserialize: (str) => JSON.parse(str),
+  },
+  // We will use `messages` array in our database to store user messages using exported lowdb instance from LocalSession via Telegraf Context
+  state: {
+		selectedDays: [0, 0, 0, 0, 0, 0, 0],
+		selectedAlarmDays: [0, 0, 0, 0, 0, 0, 0],
+  	weekDays: ["ma", "di", "wo", "do", "vr", "za", "zo"]
+	}
+})
+
+localSession.DB.then(DB => {
+  // Database now initialized, so now you can retrieve anything you want from it
+  console.log('Current LocalSession DB:', DB.value())
+  // console.log(DB.get('sessions').getById('1:1').value())
+})
 
 // Handler factoriess
 const {
@@ -23,10 +54,16 @@ const {
 } = Stage
 
 const state = {
-  selectedDays: [0, 0, 0, 0, 0, 0, 0],
-	selectedAlarmDays: [0, 0, 0, 0, 0, 0, 0],
-  weekDays: ["ma", "di", "wo", "do", "vr", "za", "zo"]
+
 }
+
+
+
+
+
+//
+// SCENE SETUP
+//
 
 const authenticate = new WizardScene(
 	'authenticate', // first argument is Scene_ID, same as for BaseScene
@@ -40,7 +77,7 @@ const authenticate = new WizardScene(
 			ctx.reply('Incorrecte pincode');
 			return;
 		}
-		state.chatID = ctx.message.chat.id;
+		ctx[property].chatID = ctx.message.chat.id;
 		await ctx.reply('Dat is correct!');
 		return next(ctx, true);
 	},
@@ -53,8 +90,8 @@ const authenticate = new WizardScene(
 			ctx.reply('Is dat je echte naam?');
 			return back(ctx, true);
 		}
-		state.name = ctx.message.text;
-		await ctx.reply(`Hi ${state.name}!`);
+		ctx[property].name = ctx.message.text;
+		await ctx.reply(`Hi ${ctx[property].name}!`);
 		ctx.reply('Ik ben SleepyBot, jouw digitale bedtijdassistent. Ik ga je ondersteunen bij een gebalanceerd slaapritme!')
 		return ctx.scene.enter('setup');
 	},
@@ -76,11 +113,16 @@ const back = (ctx, instant) => {
 	return ctx.wizard.back();
 }
 
+const selectStep = (ctx, i) => {
+	ctx.wizard.selectStep(i)
+	return ctx.wizard.steps[ctx.wizard.cursor](ctx)
+}
+
 const setup = new WizardScene(
 	'setup', // first argument is Scene_ID, same as for BaseScene
 	async (ctx) => {
-		state.configured = false;
-		state.chatID = ctx.message.chat.id;
+		ctx[property].configured = false;
+		ctx[property].chatID = ctx.message.chat.id;
 		await ctx.reply('Laten we beginnen met configuren.')
 		await ctx.reply('Wetenschappelijk onderzoek heeft aangetoond dat op regelmatige tijden naar bed gaan en opstaan werkt om beter te slapen.')
 		ctx.reply('Hoe laat wil je iedere dag in bed liggen om te slapen?', Extra.markup(Markup.removeKeyboard()));
@@ -91,9 +133,8 @@ const setup = new WizardScene(
     if (!re.test(ctx.message.text)) {
       ctx.reply("Geef een tijdstip op, in de vorm uu:mm")
 			console.log("wrong date");
-			return back(ctx, true);
     }
-		state.bedtime = ctx.message.text;
+		ctx[property].bedtime = ctx.message.text;
 		return next(ctx, true)
 	},
   async (ctx) => {
@@ -101,7 +142,7 @@ const setup = new WizardScene(
   		.add('1 min', '5 min', '10 min', '20 min')
   		.add('30 min', '45 min', '60 min')
 
-		if (state.bedtime.slice(':')[0] < 10) {
+		if (ctx[property].bedtime.slice(':')[0] < 10) {
 			await ctx.reply('Het is daarnaast ook goed voor je nachtrust om al een tijdje daarvoor je bed in te duiken om een ontspannende activiteit te ondernemen zoals een boek lezen of de dag te overdenken.')
 			ctx.reply('Hoe veel minuten van tevoren zal ik je hieraan herinneren?', ctx.wizard.state.keyboard.draw());
 		} else {
@@ -113,20 +154,23 @@ const setup = new WizardScene(
 	},
 	async (ctx) => {
 		console.log(ctx.message.text);
-		state.bedtimeNotification = ctx.message.text.replace(/[^0-9]/g, '');
-		if (state.bedtimeNotification.length <= 0) {
+		ctx[property].bedtimeNotification = ctx.message.text.replace(/[^0-9]/g, '');
+		if (ctx[property].bedtimeNotification.length <= 0) {
 			ctx.reply("Geef het aantal minuten op als een getal.")
 			return back(ctx, true);
 		}
-		await ctx.reply("Staat genoteerd!", ctx.wizard.state.keyboard.clear()); //Extra.markup(Markup.removeKeyboard()));
-		console.log(state.bedtimeNotification)
+		console.log(ctx.wizard.state.keyboard)
+		if (ctx.wizard.state.keyboard.clear) await ctx.reply("Staat genoteerd!", ctx.wizard.state.keyboard.clear()); //Extra.markup(Markup.removeKeyboard()));
+		console.log(ctx[property].bedtimeNotification)
 		return next(ctx, true)
   },
-	(ctx) => {
-		state.currentDays = state.selectedDays;
-		state.configuring = "bedtime";
+	async (ctx) => {
+		ctx[property].currentDays = await ctx[property + 'DB'].get('selectedDays').value();
+		ctx[property].weekDays = await ctx[property + 'DB'].get('weekDays').value();
+		console.log(ctx[property].currentDays);
+		ctx[property].configuring = "bedtime";
 		ctx.reply('Op welke dagen zal ik je aan je bedtijd herinneren?', Extra.HTML().markup((m) => {
-			return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays))
+			return m.inlineKeyboard(mainItem(m, ctx[property].weekDays, ctx[property].currentDays))
 		}))
 	},
 	(ctx) => {
@@ -139,24 +183,24 @@ const setup = new WizardScene(
       ctx.reply("Geef een tijdstip op, in de vorm uu:mm")
 			return back(ctx, true);
     }
-		state.alarm = ctx.message.text;
+		ctx[property].alarm = ctx.message.text;
 		return next(ctx, true)
 	},
-	(ctx) => {
-		state.currentDays = state.selectedAlarmDays;
-		state.configuring = "alarm";
+	async (ctx) => {
+		ctx[property].currentDays = await ctx[property + 'DB'].get('selectedAlarmDays').value();
+		ctx[property].configuring = "alarm";
 		ctx.reply('Op welke dagen staat je wekker aan?', Extra.HTML().markup((m) => {
 			// console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
-			return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays))
+			return m.inlineKeyboard(mainItem(m, ctx[property].weekDays, ctx[property].currentDays))
 		}))
 	},
 	async (ctx) => {
-		if (!state.configured) {
+		if (!ctx[property].configured) {
 			return;
 		}
 		ctx.reply('Oké, alles staat klaar! 🚀')
 		await ctx.reply('Als je deze instelling later nog een keer wil aanpassen stuur dan /configure')
-    ctx.scene.leave()
+    ctx.scene.enter('idle')
 	}
 );
 
@@ -171,55 +215,58 @@ setup.command('quit', async (ctx) => {
 
 setup.action(/item-([1-7])/, (ctx) => {
   const index = (ctx.match && ctx.match[1]) - 1
-  state.currentDays[index] = Number(!state.currentDays[index])
+  ctx[property].currentDays[index] = Number(!ctx[property].currentDays[index])
+	console.log(ctx[property].weekDays);
+	console.log(ctx[property].currentDays);
   ctx.editMessageText('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
-    return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays));
+    return m.inlineKeyboard(mainItem(m, ctx[property].weekDays, ctx[property].currentDays));
   }))
 })
 
 setup.action('done', async (ctx) => {
   console.log("done")
-  const selected = state.weekDays.filter((button, i) => {
-    if (state.currentDays[i] != 0) return button
+  const selected = ctx[property].weekDays.filter((button, i) => {
+    if (ctx[property].currentDays[i] != 0) return button
   });
   if (selected.length > 0) {
     let days = selected.map((d, i) =>
     `${d}`).join(', ');
     await ctx.reply(`Staat genoteerd voor ${days}!`)
 
-		let time = state.configuring === "bedtime" ? state.bedtime : state.alarm;
+		let time = ctx[property].configuring === "bedtime" ? ctx[property].bedtime : ctx[property].alarm;
 
 		let hour = time.split(':')[0];
 		let minutes = time.split(':')[1];
-		if (state.configuring === "bedtime") {
-			minutes -= state.bedtimeNotification;
+		if (ctx[property].configuring === "bedtime") {
+			minutes -= ctx[property].bedtimeNotification;
 			if (minutes < 0) {
 				minutes = 60 + minutes;
 				hour--;
 			}
 		}
 		days = selected.map((d) => {
-			let i = state.weekDays.findIndex(x => x === d)
+			let i = ctx[property].weekDays.findIndex(x => x === d)
 			return `${i+1}`;
 		}).join(',');
 
 		console.log(`0 ${minutes} ${hour} * * ${days}`);
-		if (state.configuring === "bedtime") {
-			state.selectedDays = state.currentDays;
+		if (ctx[property].configuring === "bedtime") {
+			ctx[property + 'DB'].set('selectedDays', ctx[property].currentDays).write();
 			if (state.bedtimeTask) state.bedtimeTask.destroy();
 			state.bedtimeTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
-				bot.telegram.sendMessage(state.chatID, "Het is tijd!");
+				bot.telegram.sendMessage(ctx[property].chatID, "Het is tijd!");
+				ctx.scene.enter('reminding')
 			});
 		} else {
-			state.selectedAlarmDays = state.currentDays;
+			ctx[property + 'DB'].set('selectedAlarmDays', ctx[property].currentDays).write();
 			if (state.alarmTask) state.alarmTask.destroy();
 			state.alarmTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
-				bot.telegram.sendMessage(state.chatID, "Tijd om op te staan!");
+				bot.telegram.sendMessage(ctx[property].chatID, "Tijd om op te staan!");
+				ctx.scene.enter('wakeup')
 			});
 		}
 
-    // TODO: store data?
-		if (state.configuring === "alarm") state.configured = true;
+		if (ctx[property].configuring === "alarm") ctx[property].configured = true;
 		next(ctx, true);
   } else {
     ctx.reply('Je hebt geen dagen geselecteerd, as je mij wilt uitzetten gebruik dan /quit');
@@ -238,25 +285,152 @@ function mainItem (m, buttons, s, bedtime) {
   return [b, d];
 }
 
-const reminding = new Scene('reminding')
-reminding.enter((ctx) => ctx.reply('Time for bed!'))
-reminding.leave((ctx) => ctx.reply('exiting echo scene'))
-reminding.command('back', leave())
-reminding.on('text', (ctx) => ctx.reply(ctx.message.text))
-reminding.on('message', (ctx) => ctx.reply('Only text messages please'))
+const reminding = new WizardScene('reminding',
+	(ctx) => {
+		console.log("step 1")
+		localSession.saveSession(localSession.getSessionKey(ctx), ctx[property])
+		ctx.reply('Tijd om je bed op te zoeken!')
+		next(ctx, true);
+
+		if (state.reminderTask) state.reminderTask.destroy();
+		scheduleReminder(ctx);
+	},
+	(ctx) => {
+		console.log("step 2")
+		return
+	},
+	(ctx) => {
+		console.log("step 3")
+		ctx.wizard.state.keyboard = new Keyboard()
+  		.add('Ja! 🛌')
+  		.add('Nee geef me nog eventjes. ⏳')
+
+		ctx.reply('Lig je er al in?', ctx.wizard.state.keyboard.draw())
+		state.reminderTask.stop()
+		return next(ctx, false);
+	},
+	(ctx) => {
+		console.log("step 4")
+		if (/Ja/i.test(ctx.message.text)) {
+			console.log("to end")
+			return selectStep(ctx, 5)
+		} else if (/Nee/i.test(ctx.message.text)) {
+			console.log("to beginning")
+			selectStep(ctx, 1)
+			scheduleReminder(ctx);
+			return;
+		}
+	},
+	(ctx) => {
+		console.log("step 5")
+
+	},
+	(ctx) => {
+		console.log("step 6")
+		ctx.reply('Slaap lekker!', ctx.wizard.state.keyboard.clear())
+		ctx.scene.enter('idle');
+		state.reminderTask.destroy();
+	}
+)
+
+const scheduleReminder = (ctx) => {
+	state.reminderTask = cron.schedule(`*/30 * * * * *`, () => {
+		next(ctx, true);
+	});
+}
+
+
+
+const wakeup = new WizardScene('wakeup',
+	(ctx) => {
+		console.log("step 1")
+		localSession.saveSession(localSession.getSessionKey(ctx), ctx[property])
+		ctx.reply('Goedemorgen!')
+		next(ctx, true);
+
+		if (state.reminderTask) state.reminderTask.destroy();
+		scheduleReminder(ctx);
+	},
+	(ctx) => {
+		console.log("step 2")
+		return
+	},
+	(ctx) => {
+		console.log("step 3")
+		ctx.wizard.state.keyboard = new Keyboard()
+  		.add('Ja! 🌅')
+  		.add('Nee nog niet... ⏳')
+
+		ctx.reply('Ben je er al uit?', ctx.wizard.state.keyboard.draw())
+		state.reminderTask.stop()
+		return next(ctx, false);
+	},
+	(ctx) => {
+		console.log("step 4")
+		if (/Ja/i.test(ctx.message.text)) {
+			return selectStep(ctx, 5)
+		} else if (/Nee/i.test(ctx.message.text)) {
+			selectStep(ctx, 1)
+			scheduleReminder(ctx);
+			return;
+		}
+	},
+	(ctx) => {
+		console.log("step 5")
+
+	},
+	(ctx) => {
+		console.log("step 6")
+		ctx.reply('Fijne dag!', ctx.wizard.state.keyboard.clear())
+		ctx.scene.enter('idle');
+		state.reminderTask.destroy();
+	}
+)
+
+const wakeupReminder = (ctx) => {
+	state.reminderTask = cron.schedule(`0 * * * * *`, () => {
+		next(ctx, true);
+	});
+}
+
+const idle = new Scene('idle')
+idle.enter((ctx) => {
+	localSession.saveSession(localSession.getSessionKey(ctx), ctx[property])
+	ctx.reply('Over en uit voor nu 💤')
+})
+idle.command('configure', (ctx) => {
+	ctx.scene.enter('setup');
+})
+idle.command('reminding', (ctx) => {
+	ctx.scene.enter('reminding');
+})
+// idle.on('text', (ctx) => {
+// 	ctx.reply(ctx.message.text);
+// })
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-const stage = new Stage([authenticate, setup, reminding])
-bot.use(session())
+const stage = new Stage([authenticate, setup, idle, reminding, wakeup])
+
+bot.use(async (ctx, next) => {
+	if (ctx.message) console.log(ctx.message.text);
+	next()
+})
+
+bot.use(localSession.middleware(property))
+// bot.use(session())
 bot.use(stage.middleware())
-bot.command('/configure', '/setup', '/configureer', (ctx) => {
+
+
+bot.command('/configure', (ctx) => {
 	ctx.scene.enter('setup');
 })
 bot.command('/start', async (ctx) => {
-	// ctx.reply("Hi there! I'm a bot that will help you take charge of your bedtime routines! Are you ready to embark on a journey?")
-	// await ctx.replyWithAnimation('CgACAgQAAxkBAAICZV7VE_ZiduYntjIP8pVmS8XRoWFBAAL5AQAC07OsUktiyspJZF1CGQQ')
-  ctx.scene.enter('authenticate') // TODO: Switch to authenticate
+	ctx.reply("Hallo daar! Klaar om je bedtijdroutine onder controle te krijgen?")
+	await ctx.replyWithAnimation('CgACAgQAAxkBAAICZV7VE_ZiduYntjIP8pVmS8XRoWFBAAL5AQAC07OsUktiyspJZF1CGQQ')
+	// console.log(ctx);
+	// console.log(localSession.getSessionKey(ctx))
+	ctx.scene.enter('authenticate') // TODO: Switch to authenticate
 })
 
 
@@ -314,21 +488,21 @@ bot.launch()
 
 
 
-state.task = cron.schedule('1 * * * * *', () => {
-	bot.telegram.sendMessage(state.chatID, "test");
-	//
-	// bot.reply(1083726752).text("test").then((err, result) => {
-	//   bot.context.state = 1;
-	//   if (err) {
-	//     console.error("Sending message failed!");
-	//   } else {
-	//     // logMessage(result)
-	//   }
-	// });
-	// task.destroy()
-}, {
-	scheduled: false
-});
+// state.task = cron.schedule('1 * * * * *', () => {
+// 	bot.telegram.sendMessage(state.chatID, "test");
+// 	//
+// 	// bot.reply(1083726752).text("test").then((err, result) => {
+// 	//   bot.context.state = 1;
+// 	//   if (err) {
+// 	//     console.error("Sending message failed!");
+// 	//   } else {
+// 	//     // logMessage(result)
+// 	//   }
+// 	// });
+// 	// task.destroy()
+// }, {
+// 	scheduled: false
+// });
 
 
 

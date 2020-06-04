@@ -10,7 +10,7 @@ const homedir = os.homedir();
 const bot = new Telegraf(process.env.BOT_TOKEN) // Your Bot token here
 
 // Name of session property object in Telegraf Context (default: 'session')
-const property = 'session'
+const property = 'data'
 
 
 
@@ -18,7 +18,7 @@ const localSession = new LocalSession({
   // Database name/path, where sessions will be located (default: 'sessions.json')
   database: homedir + '/example_db.json',
   // Name of session property object in Telegraf Context (default: 'session')
-  property: 'session',
+  property: 'data',
   // Type of lowdb storage (default: 'storageFileSync')
   storage: LocalSession.storageFileAsync,
   // Format of storage/database (default: JSON.stringify / JSON.parse)
