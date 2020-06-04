@@ -24,27 +24,9 @@ const {
 
 const state = {
   selectedDays: [0, 0, 0, 0, 0, 0, 0],
+	selectedAlarmDays: [0, 0, 0, 0, 0, 0, 0],
   weekDays: ["ma", "di", "wo", "do", "vr", "za", "zo"]
 }
-
-// Greeter scene
-// const greeterScene = new Scene('greeter')
-// greeterScene.enter((ctx) => {
-//   // console.log(ctx);
-//   ctx.reply('Hi');
-//   ctx.scene.enter('reminding');
-// })
-// greeterScene.leave((ctx) => ctx.reply('Bye'))
-// greeterScene.hears('hi', enter('greeter'))
-// greeterScene.on('message', (ctx) => ctx.replyWithMarkdown('Send `hi`'))
-
-// Echo scene
-// const echoScene = new Scene('echo')
-// echoScene.enter((ctx) => ctx.reply('echo scene'))
-// echoScene.leave((ctx) => ctx.reply('exiting echo scene'))
-// echoScene.command('back', leave())
-// echoScene.on('text', (ctx) => ctx.reply(ctx.message.text))
-// echoScene.on('message', (ctx) => ctx.reply('Only text messages please'))
 
 const authenticate = new WizardScene(
 	'authenticate', // first argument is Scene_ID, same as for BaseScene
@@ -52,22 +34,28 @@ const authenticate = new WizardScene(
 		ctx.reply(`Omdat ik nog in een experimentele fase ben heb je een pincode nodig om mij te kunnen gebruiken. Wat is de pincode?`);
 		return ctx.wizard.next();
 	},
-	(ctx) => {
+	async (ctx) => {
 		// validation
 		if (ctx.message.text != process.env.AUTH_PIN) {
 			ctx.reply('Incorrecte pincode');
 			return;
 		}
 		state.chatID = ctx.message.chat.id;
-		ctx.reply('Thanks, what is your name?');
-		return ctx.wizard.next();
+		await ctx.reply('Dat is correct!');
+		return next(ctx, true);
 	},
 	async (ctx) => {
-		ctx.wizard.state.contactData.email = ctx.message.text;
-		state.task.start();
-		ctx.reply(`Thank you for your replies, we'll contact your soon`);
-		// await mySendContactDataMomentBeforeErase(ctx.wizard.state.contactData);
-		// return ctx.scene.leave();
+		ctx.reply('Met wie heb ik het genoegen om kennis te maken?');
+		return next(ctx, false);
+	},
+	(ctx) => {
+		if (ctx.message.text.length < 2) {
+			ctx.reply('Is dat je echte naam?');
+			return back(ctx, true);
+		}
+		state.name = ctx.message.text;
+		ctx.reply(`Hi ${state.name}!`);
+		return ctx.scene.enter('setup');
 	},
 );
 
@@ -90,14 +78,12 @@ const back = (ctx, instant) => {
 const setup = new WizardScene(
 	'setup', // first argument is Scene_ID, same as for BaseScene
 	(ctx) => {
-		console.log("stage 1");
 		state.configured = false;
 		state.chatID = ctx.message.chat.id;
-		ctx.reply('Wanneer wil je in bed liggen?');
+		ctx.reply('Wanneer wil je in bed liggen?', Extra.markup(Markup.removeKeyboard()));
 		return next(ctx, false);
 	},
 	(ctx) => {
-		console.log("stage 2");
 		const re = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
     if (!re.test(ctx.message.text)) {
       ctx.reply("Geef een tijdstip op, in de vorm uu:mm")
@@ -105,7 +91,6 @@ const setup = new WizardScene(
 			return back(ctx, true);
     }
 		state.bedtime = ctx.message.text;
-
 		return next(ctx, true)
 	},
   (ctx) => {
@@ -120,28 +105,53 @@ const setup = new WizardScene(
 		}
 		return next(ctx, false)
 	},
-	(ctx) => {
+	async (ctx) => {
 		console.log(ctx.message.text);
 		state.bedtimeNotification = ctx.message.text.replace(/[^0-9]/g, '');
 		if (state.bedtimeNotification.length <= 0) {
 			ctx.reply("Geef het aantal minuten op als een getal.")
 			return back(ctx, true);
 		}
+		await ctx.reply("Staat genoteerd!", ctx.wizard.state.keyboard.clear()); //Extra.markup(Markup.removeKeyboard()));
 		console.log(state.bedtimeNotification)
 		return next(ctx, true)
   },
 	(ctx) => {
+		state.currentDays = state.selectedDays;
+		state.configuring = "bedtime";
 		ctx.reply('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
 			// console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
-			return m.inlineKeyboard(mainItem(m, state.weekDays, state.selectedDays))
+			return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays))
 		}))
-    return ctx.wizard.next();
-		console.log("stage 4");
+	},
+	(ctx) => {
+		ctx.reply('Voor hoe laat staat je wekker?', Extra.markup(Markup.removeKeyboard()));
+		return next(ctx, false);
+	},
+	(ctx) => {
+		const re = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+    if (!re.test(ctx.message.text)) {
+      ctx.reply("Geef een tijdstip op, in de vorm uu:mm")
+			return back(ctx, true);
+    }
+		state.alarm = ctx.message.text;
+		return next(ctx, true)
+	},
+	(ctx) => {
+		state.currentDays = state.selectedAlarmDays;
+		state.configuring = "alarm";
+		ctx.reply('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
+			// console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
+			return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays))
+		}))
+	},
+	(ctx) => {
 		if (!state.configured) {
 			return;
 		}
-    // ctx.scene.leave()
-	},
+		ctx.reply('Oké, alles staat klaar! 🚀')
+    ctx.scene.leave()
+	}
 );
 
 setup.command('quit', async (ctx) => {
@@ -150,66 +160,76 @@ setup.command('quit', async (ctx) => {
 	// TODO: await confirmation (or do this in another scene?)
 	// TODO: invalidate timers
 	state.bedtimeTask.destroy();
+	state.alarmTask.destroy();
 })
 
-setup.action(/item-([1-7])/, async (ctx) => {
+setup.action(/item-([1-7])/, (ctx) => {
   const index = (ctx.match && ctx.match[1]) - 1
-  state.selectedDays[index] = Number(!state.selectedDays[index])
+  state.currentDays[index] = Number(!state.currentDays[index])
   ctx.editMessageText('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
     // console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
-    return m.inlineKeyboard(mainItem(m, state.weekDays, state.selectedDays));
+    return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays));
   }))
 })
 
-setup.action('done', (ctx) => {
+setup.action('done', async (ctx) => {
   console.log("done")
   const selected = state.weekDays.filter((button, i) => {
-    if (state.selectedDays[i] != 0) return button
+    if (state.currentDays[i] != 0) return button
   });
   if (selected.length > 0) {
     let days = selected.map((d, i) =>
     `${d}`).join(', ');
-    ctx.reply(`I will notify you on ${days}`)
+    await ctx.reply(`Staat genoteerd voor ${days}!`)
 
-		let hour = state.bedtime.split(':')[0];
-		let minutes = state.bedtime.split(':')[1];
+		let time = state.configuring === "bedtime" ? state.bedtime : state.alarm;
+
+		let hour = time.split(':')[0];
+		let minutes = time.split(':')[1];
+		if (state.configuring === "bedtime") {
+			minutes -= state.bedtimeNotification;
+			if (minutes < 0) {
+				minutes = 60 + minutes;
+				hour--;
+			}
+		}
 		days = selected.map((d) => {
 			let i = state.weekDays.findIndex(x => x === d)
 			return `${i+1}`;
-		}
-    ).join(',');
+		}).join(',');
 
 		console.log(`0 ${minutes} ${hour} * * ${days}`);
-		if (state.bedtimeTask) state.bedtimeTask.destroy();
-		state.bedtimeTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
-			bot.telegram.sendMessage(state.chatID, "Het is tijd!");
-			//
-			// bot.reply(1083726752).text("test").then((err, result) => {
-			//   bot.context.state = 1;
-			//   if (err) {
-			//     console.error("Sending message failed!");
-			//   } else {
-			//     // logMessage(result)
-			//   }
-			// });
-			// task.destroy()
-		});
+		if (state.configuring === "bedtime") {
+			state.selectedDays = currentDays;
+			if (state.bedtimeTask) state.bedtimeTask.destroy();
+			state.bedtimeTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
+				bot.telegram.sendMessage(state.chatID, "Het is tijd!");
+			});
+		} else {
+			state.selectedAlarmDays = currentDays;
+			if (state.alarmTask) state.alarmTask.destroy();
+			state.alarmTask = cron.schedule(`0 ${minutes} ${hour} * * ${days}`, () => {
+				bot.telegram.sendMessage(state.chatID, "Tijd om op te staan!");
+			});
+		}
 
-    // TODO: schedule timers
     // TODO: store data?
-		state.configured = true;
+		if (state.configuring === "alarm") state.configured = true;
+		next(ctx, true);
   } else {
     ctx.reply('Je hebt geen dagen geselecteerd, as je mij wilt uitzetten gebruik dan /quit');
   }
 })
 
-function mainItem (m, buttons, s) {
+
+function mainItem (m, buttons, s, bedtime) {
   const b = buttons.map((button, i) => (
     m.callbackButton(`${button} ${s[i] ? '✓' : ''}`, `item-${i + 1}`)
   ))
-  console.log(b);
-  const d = [m.callbackButton('klaar', 'done')];
-
+	let d = [m.callbackButton('klaar', 'done')];
+	if (bedtime) {
+		d = [m.callbackButton('klaar', 'done-alarm')];
+	}
   return [b, d];
 }
 
@@ -225,13 +245,10 @@ const bot = new Telegraf(process.env.BOT_TOKEN)
 const stage = new Stage([authenticate, setup, reminding])
 bot.use(session())
 bot.use(stage.middleware())
-// bot.command('greeter', (ctx) => ctx.scene.enter('greeter'))
-// bot.command('echo', (ctx) => ctx.scene.enter('echo'))
-// bot.command('wizard', (ctx) => ctx.scene.enter('wizard'))
 bot.command('/start', async (ctx) => {
 	// ctx.reply("Hi there! I'm a bot that will help you take charge of your bedtime routines! Are you ready to embark on a journey?")
 	// await ctx.replyWithAnimation('CgACAgQAAxkBAAICZV7VE_ZiduYntjIP8pVmS8XRoWFBAAL5AQAC07OsUktiyspJZF1CGQQ')
-  ctx.scene.enter('setup') // TODO: Switch to authenticate
+  ctx.scene.enter('authenticate') // TODO: Switch to authenticate
 })
 
 
@@ -300,7 +317,6 @@ state.task = cron.schedule('1 * * * * *', () => {
 	//     // logMessage(result)
 	//   }
 	// });
-	console.log("cron")
 	// task.destroy()
 }, {
 	scheduled: false
