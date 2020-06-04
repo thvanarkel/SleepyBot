@@ -44,17 +44,18 @@ const authenticate = new WizardScene(
 		await ctx.reply('Dat is correct!');
 		return next(ctx, true);
 	},
-	async (ctx) => {
+	(ctx) => {
 		ctx.reply('Met wie heb ik het genoegen om kennis te maken?');
 		return next(ctx, false);
 	},
-	(ctx) => {
+	async (ctx) => {
 		if (ctx.message.text.length < 2) {
 			ctx.reply('Is dat je echte naam?');
 			return back(ctx, true);
 		}
 		state.name = ctx.message.text;
-		ctx.reply(`Hi ${state.name}!`);
+		await ctx.reply(`Hi ${state.name}!`);
+		ctx.reply('Ik ben SleepyBot, jouw digitale bedtijdassistent. Ik ga je ondersteunen bij een gebalanceerd slaapritme!')
 		return ctx.scene.enter('setup');
 	},
 );
@@ -77,10 +78,12 @@ const back = (ctx, instant) => {
 
 const setup = new WizardScene(
 	'setup', // first argument is Scene_ID, same as for BaseScene
-	(ctx) => {
+	async (ctx) => {
 		state.configured = false;
 		state.chatID = ctx.message.chat.id;
-		ctx.reply('Wanneer wil je in bed liggen?', Extra.markup(Markup.removeKeyboard()));
+		await ctx.reply('Laten we beginnen met configuren.')
+		await ctx.reply('Wetenschappelijk onderzoek heeft aangetoond dat op regelmatige tijden naar bed gaan en opstaan werkt om beter te slapen.')
+		ctx.reply('Hoe laat wil je in bed liggen om te slapen?', Extra.markup(Markup.removeKeyboard()));
 		return next(ctx, false);
 	},
 	(ctx) => {
@@ -93,15 +96,18 @@ const setup = new WizardScene(
 		state.bedtime = ctx.message.text;
 		return next(ctx, true)
 	},
-  (ctx) => {
+  async (ctx) => {
 		ctx.wizard.state.keyboard = new Keyboard()
   		.add('1 min', '5 min', '10 min', '20 min')
   		.add('30 min', '45 min', '60 min')
 
 		if (state.bedtime.slice(':')[0] < 10) {
-			ctx.reply('Lekker op tijd! Hoe veel minuten van tevoren wil je hieraan herinnerd worden?', ctx.wizard.state.keyboard.draw());
+			await ctx.reply('Het is daarnaast ook goed voor je nachtrust om al een tijdje daarvoor je bed in te duiken om een ontspannende activiteit te ondernemen zoals een boek lezen of de dag te overdenken.')
+			ctx.reply('Hoe veel minuten van tevoren zal ik je hieraan herinneren?', ctx.wizard.state.keyboard.draw());
 		} else {
-			ctx.reply('Dat is wel wat aan de late kant! Hoe veel minuten van tevoren wil je hieraan herinnerd worden?', ctx.wizard.state.keyboard.draw());
+			await ctx.reply('Dat is wel wat aan de late kant!');
+			await ctx.reply('Het is daarnaast ook goed voor je nachtrust om al een tijdje daarvoor je bed in te duiken om een ontspannende activiteit te ondernemen zoals een boek lezen of de dag te overdenken.')
+			ctx.reply('Hoe veel minuten van tevoren zal ik je hieraan herinneren?', ctx.wizard.state.keyboard.draw());
 		}
 		return next(ctx, false)
 	},
@@ -119,13 +125,12 @@ const setup = new WizardScene(
 	(ctx) => {
 		state.currentDays = state.selectedDays;
 		state.configuring = "bedtime";
-		ctx.reply('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
-			// console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
+		ctx.reply('Op welke dagen zal ik je aan je bedtijd herinneren?', Extra.HTML().markup((m) => {
 			return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays))
 		}))
 	},
 	(ctx) => {
-		ctx.reply('Voor hoe laat staat je wekker?', Extra.markup(Markup.removeKeyboard()));
+		ctx.reply('Hoe laat staat je wekker in de ochtend?', Extra.markup(Markup.removeKeyboard()));
 		return next(ctx, false);
 	},
 	(ctx) => {
@@ -140,16 +145,17 @@ const setup = new WizardScene(
 	(ctx) => {
 		state.currentDays = state.selectedAlarmDays;
 		state.configuring = "alarm";
-		ctx.reply('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
+		ctx.reply('Op welke dagen staat je wekker aan?', Extra.HTML().markup((m) => {
 			// console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
 			return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays))
 		}))
 	},
-	(ctx) => {
+	async (ctx) => {
 		if (!state.configured) {
 			return;
 		}
 		ctx.reply('Oké, alles staat klaar! 🚀')
+		await ctx.reply('Als je deze instelling later nog een keer wil aanpassen stuur dan /configure')
     ctx.scene.leave()
 	}
 );
@@ -167,7 +173,6 @@ setup.action(/item-([1-7])/, (ctx) => {
   const index = (ctx.match && ctx.match[1]) - 1
   state.currentDays[index] = Number(!state.currentDays[index])
   ctx.editMessageText('Wanneer wil je een herinnering?', Extra.HTML().markup((m) => {
-    // console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
     return m.inlineKeyboard(mainItem(m, state.weekDays, state.currentDays));
   }))
 })
@@ -245,6 +250,9 @@ const bot = new Telegraf(process.env.BOT_TOKEN)
 const stage = new Stage([authenticate, setup, reminding])
 bot.use(session())
 bot.use(stage.middleware())
+bot.command('/configure', '/setup', '/configureer', (ctx) => {
+	ctx.scene.enter('setup');
+})
 bot.command('/start', async (ctx) => {
 	// ctx.reply("Hi there! I'm a bot that will help you take charge of your bedtime routines! Are you ready to embark on a journey?")
 	// await ctx.replyWithAnimation('CgACAgQAAxkBAAICZV7VE_ZiduYntjIP8pVmS8XRoWFBAAL5AQAC07OsUktiyspJZF1CGQQ')
