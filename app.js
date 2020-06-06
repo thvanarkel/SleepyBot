@@ -159,11 +159,13 @@ const setup = new WizardScene(
 	},
 	async (ctx) => {
 		// console.log(ctx.message.text);
-		ctx[property + 'DB'].set('bedtimeNotification', ctx.message.text.replace(/[^0-9]/g)).write();
-		if (ctx[property + 'DB'].get('bedtimeNotification').value().length <= 0) {
+    let time = ctx.message.text.replace(/[^0-9]/g)
+    console.log(time);
+		if (parseInt(time) <= 0) {
 			ctx.reply("Geef het aantal minuten op als een getal.")
 			return back(ctx, true);
 		}
+    ctx[property + 'DB'].set('bedtimeNotification', parseInt(time)).write();
 		// console.log(ctx.wizard.state.keyboard)
 		if (ctx.wizard.state.keyboard.clear) await ctx.reply("Staat genoteerd!", ctx.wizard.state.keyboard.clear()); //Extra.markup(Markup.removeKeyboard()));
 		// console.log(ctx[property].bedtimeNotification)
@@ -254,7 +256,7 @@ setup.action('done', async (ctx) => {
 			return `${i+1}`;
 		}).join(',');
 
-		// console.log(`0 ${minutes} ${hour} * * ${days}`);
+		console.log(`0 ${minutes} ${hour} * * ${days}`);
 		if (ctx[property].configuring === "bedtime") {
 			ctx[property + 'DB'].set('selectedDays', ctx[property].currentDays).write();
 			if (state.bedtimeTask) state.bedtimeTask.destroy();
@@ -330,7 +332,7 @@ const reminding = new WizardScene('reminding',
 	},
 	(ctx) => {
 		if (/Ja/i.test(ctx.message.text)) {
-			return selectStep(ctx, 5)
+			return selectStep(ctx, 4)
 		} else if (/Nee/i.test(ctx.message.text)) {
 			selectStep(ctx, 1)
 			scheduleReminder(ctx);
@@ -347,11 +349,11 @@ const reminding = new WizardScene('reminding',
 		]))
 	},
 	async (ctx) => {
-		await ctx.reply(randomItem[
+		await ctx.reply(randomItem([
 			'Tijd om die telefoon weg te leggen!',
 			'Tijd om het bed in te duiken!',
 			'Zet die do not disturb modus maar aan!',
-			'Tijd om dag te zeggen!']);
+			'Tijd om dag te zeggen!']));
 		await ctx.replyWithAnimation('CgACAgQAAxkBAAIN2l7Y8wsjbXAqsjHCqUbgr_Q-eSQ5AAJWAgACDIakUsYgTfEFKE5cGgQ')
 		ctx.reply(randomItem([
 			'Slaap lekker!',
@@ -391,13 +393,13 @@ const wakeup = new WizardScene('wakeup',
 	(ctx) => {
 		ctx.wizard.state.keyboard = new Keyboard()
   		.add('Ja! 🌅')
-  		.add('Nee nog niet... ⏳')
+  		.add('Nee, ik lig er nog in... ⏳')
 
 		ctx.reply(randomItem([
 			'Ondertussen al weer je bed uit?',
 			'Ben je al met frisse tegenzin aan de dag begonnen?',
 			'Zijn we dat bed al weer een keertje uit?',
-			'Lig je nog steeds in je bed?'
+			'Al weer aan de dag begonnen?'
 		]), ctx.wizard.state.keyboard.draw())
 		state.reminderTask.stop()
 		return next(ctx, false);

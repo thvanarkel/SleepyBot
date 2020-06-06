@@ -47,8 +47,8 @@ class PushContext extends Context {
     writeApi.writePoint(point)
 		writeApi.close()
     .then(() => {
-      console.log(`${point}`)
-      console.log("wrote point")
+      // console.log(`${point}`)
+      // console.log("wrote point")
     })
     .catch(e => {
       console.log(e)
