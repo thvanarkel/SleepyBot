@@ -37,13 +37,14 @@ const localSession = new LocalSession({
 	}
 })
 
-localSession.DB.then(DB => {
-  // Database now initialized, so now you can retrieve anything you want from it
-  // console.log('Current LocalSession DB:', DB.value())
-  // console.log(DB.get('sessions').getById('1:1').value())
-	console.log(DB.value())
-
-})
+// localSession.DB.then(DB => {
+//   // Database now initialized, so now you can retrieve anything you want from it
+//   // console.log('Current LocalSession DB:', DB.value())
+//   // console.log(DB.get('sessions').getById('1:1').value())
+// 	// console.log(DB.value())
+//   // console.log(bot)
+//   // console.log(DB.get('sessions').value()[0])
+// })
 
 
 
@@ -443,7 +444,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN, { contextType: PushContext })
 const stage = new Stage([authenticate, setup, idle, reminding, wakeup])
 
 bot.use(async (ctx, next) => {
-	if (ctx.message) ctx.addPoint(ctx.message.text, 'user');
+	if (ctx.message) await ctx.addPoint(ctx.message.text, 'user');
 	next()
 })
 
@@ -460,4 +461,17 @@ bot.command('/start', async (ctx) => {
 	ctx.scene.enter('authenticate') // TODO: Switch to authenticate
 })
 
+bot.catch((err, ctx) => {
+  console.log(`Error for ${ctx.updateType}`, err)
+})
+
 bot.launch()
+
+
+
+Stage.enter('authenticate')
+
+// const task = cron.schedule(`0 56 10 * * *`, () => {
+//   // bot.telegram.sendMessage(ctx[property].chatID, "Tijd om op te staan!");
+//   console.log(stage)
+// });
