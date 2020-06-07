@@ -180,6 +180,7 @@ const setup = new WizardScene(
 		ctx.reply('Op welke dagen zal ik je aan je bedtijd herinneren?', Extra.HTML().markup((m) => {
 			return m.inlineKeyboard(mainItem(m, ctx[property].weekDays, ctx[property].currentDays))
 		}))
+    done = false;
 	},
 	(ctx) => {
 		ctx.reply('Hoe laat staat je wekker in de ochtend?', Extra.markup(Markup.removeKeyboard()));
@@ -201,6 +202,7 @@ const setup = new WizardScene(
 			// console.log(mainItem(m, ["ma", "di", "wo", "do", "vr"], buttonState));
 			return m.inlineKeyboard(mainItem(m, ctx[property].weekDays, ctx[property].currentDays))
 		}))
+    done = false;
 	},
 	async (ctx) => {
 		if (!ctx[property].configured) {
@@ -231,8 +233,13 @@ setup.action(/item-([1-7])/, (ctx) => {
   }))
 })
 
+let done = false;
+
 setup.action('done', async (ctx) => {
   // console.log("done")
+  if (done) {
+    return;
+  }
   const selected = ctx[property].weekDays.filter((button, i) => {
     if (ctx[property].currentDays[i] != 0) return button
   });
@@ -275,6 +282,7 @@ setup.action('done', async (ctx) => {
 		}
 
 		if (ctx[property].configuring === "alarm") ctx[property].configured = true;
+    done = true;
 		next(ctx, true);
   } else {
     ctx.reply('Je hebt geen dagen geselecteerd, as je mij wilt uitzetten gebruik dan /quit');
@@ -297,7 +305,7 @@ const reminding = new WizardScene('reminding',
 	(ctx) => {
 		localSession.saveSession(localSession.getSessionKey(ctx), ctx[property])
 		ctx.reply(randomItem([
-			'Tijd om je bed op te zoeken!',
+			`${ctx[property].name}, tijd om je bed op te zoeken!`,
 			'Hoogste tijd om naar bed te gaan',
 			'Het is weer tijd om te gaan slapen!',
 			'Het is alweer zover, tijd om naar bed te gaan!'
@@ -323,7 +331,7 @@ const reminding = new WizardScene('reminding',
   		.add('Nee geef me nog eventjes. ⏳')
 
 		ctx.reply(randomItem([
-			'Lig je er al in?',
+			`${ctx[property].name}, lig je er al in?`,
 			'Ben je al weer in je bed te vinden?',
 			'Al in je bed gekropen?',
 			'Ben je al in bed?',
@@ -357,7 +365,7 @@ const reminding = new WizardScene('reminding',
 			'Tijd om dag te zeggen!']));
 		await ctx.replyWithAnimation('CgACAgQAAxkBAAIN2l7Y8wsjbXAqsjHCqUbgr_Q-eSQ5AAJWAgACDIakUsYgTfEFKE5cGgQ')
 		ctx.reply(randomItem([
-			'Slaap lekker!',
+			`Slaap lekker ${ctx[property].name}!`,
 			'Goedenacht!',
 			'Welterusten!'
 		]), ctx.wizard.state.keyboard.clear())
@@ -378,9 +386,8 @@ const wakeup = new WizardScene('wakeup',
 		localSession.saveSession(localSession.getSessionKey(ctx), ctx[property])
 		ctx.reply(randomItem([
 			'Rise and shine!!',
-			'Goedemorgen!',
+			`Goedemorgen ${ctx[property].name}!`,
 			'Goedemorgen! Klaar voor een mooie nieuwe dag?',
-			'Carpe diem!',
 			'Daar zijn we weer, goeiemorgen!'
 		]))
 		next(ctx, true);
